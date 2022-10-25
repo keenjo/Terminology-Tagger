@@ -168,34 +168,34 @@ Vectors as one hot encoding
 - I didn't save these values in a file like the other data. I just figured we could copy this loop into the script 
   where we create the model since the one hot encodings would create a super big file. 
 '''
-total_arrs = []
+total_arrs = [] # 3D list of all of the final arrays
 
 for split in data_total:
-    split_arrs = []
+    split_arrs = [] # List of arrays for an entire dataset split
     for input in data_total[split]:
-        arrs_list = []
+        arrs_list = [] # List of arrays for one document
         for key in input:
             if 'word' in key.lower():
                 arr = np.zeros(len(just_words))
                 arr[just_words.index(int_tok[input[key]])] = 1
                 arrs_list.append(arr)
             if 'tag' in key.lower():
-                arr = np.zeros(len(just_words))
+                arr = np.zeros(len(just_tags))
                 arr[just_tags.index(int_tok[input[key]])] = 1
                 arrs_list.append(arr)
             if 'pos' in key.lower():
-                arr = np.zeros(len(just_words))
+                arr = np.zeros(len(just_pos))
                 arr[just_pos.index(int_tok[input[key]])] = 1
                 arrs_list.append(arr)
             if 'is' in key.lower():
-                arr = np.zeros(len(just_words))
+                arr = np.zeros(len(just_bool))
                 arr[just_bool.index(int_tok[input[key]])] = 1
                 arrs_list.append(arr)
-        split_arrs.append(np.vstack(arrs_list))
-    total_arrs.append(split_arrs)
+        split_arrs.append(np.hstack(arrs_list).reshape(9, 906)) # Append the arrays from one document to list of arrays for a dataset split & reshape
+    total_arrs.append(split_arrs) # Append all arrays for a given dataset split to a list that will contain all of the arrays
 
 # Testing to make sure outputs are organized as planned
-print(len(total_arrs))
+print(len(total_arrs)) # This should be 3 for the 3 dataset splits (train, dev, test)
 print(total_arrs[0][0].shape)
 print(total_arrs[0][0])
 
