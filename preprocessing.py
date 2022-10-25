@@ -1,5 +1,6 @@
 import spacy
 import pandas as pd
+import numpy as np
 import os
 import json
 from tqdm import tqdm
@@ -130,20 +131,21 @@ just_pos = list(set(just_pos))
 just_tags = list(set(just_tags))
 # Converting the vocabulary to token:integer dictionary
 vocab = just_bool + just_tags + just_pos + just_words
-vocab_dict = {}
+tok_int = {}
 for index, item in enumerate(vocab):
-    vocab_dict[item] = index
+    tok_int[item] = index + 1
 
 # Updating the data and tag dictionaries with the vocabulary integer values
 for split in data_total:
     for input in data_total[split]:
         for key in input:
-            input[key] = vocab_dict[input[key]]
+            input[key] = tok_int[input[key]]
 
 for split in combined_tags:
     for index, tag in enumerate(combined_tags[split]):
-        combined_tags[split][index] = vocab_dict[tag]
+        combined_tags[split][index] = tok_int[tag]
 
+int_tok = {v: k for k, v in tok_int.items()}
 
 # Saving the data (inputs, tags, vocabulary) as json files
 with open(f'{data_path}/inputs.json', 'w+') as file:
@@ -152,10 +154,50 @@ with open(f'{data_path}/inputs.json', 'w+') as file:
 with open(f'{data_path}/tags.json', 'w+') as file:
     json.dump(combined_tags, file)
 
-with open(f'{data_path}/vocab.json', 'w+') as file:
-    json.dump(vocab_dict, file)
+with open(f'{data_path}/vocab_tok-int.json', 'w+') as file:
+    json.dump(tok_int, file)
+
+with open(f'{data_path}/vocab_int-tok.json', 'w+') as file:
+    json.dump(int_tok, file)
 
 print(f'All inputs, tags, and vocabulary saved to {data_path}')
+
+
+'''
+Vectors as one hot encoding
+- I didn't save these values in a file like the other data. I just figured we could copy this loop into the script 
+  where we create the model since the one hot encodings would create a super big file. 
+'''
+total_arrs = []
+
+for split in data_total:
+    split_arrs = []
+    for input in data_total[split]:
+        arrs_list = []
+        for key in input:
+            if 'word' in key.lower():
+                arr = np.zeros(len(just_words))
+                arr[just_words.index(int_tok[input[key]])] = 1
+                arrs_list.append(arr)
+            if 'tag' in key.lower():
+                arr = np.zeros(len(just_words))
+                arr[just_tags.index(int_tok[input[key]])] = 1
+                arrs_list.append(arr)
+            if 'pos' in key.lower():
+                arr = np.zeros(len(just_words))
+                arr[just_pos.index(int_tok[input[key]])] = 1
+                arrs_list.append(arr)
+            if 'is' in key.lower():
+                arr = np.zeros(len(just_words))
+                arr[just_bool.index(int_tok[input[key]])] = 1
+                arrs_list.append(arr)
+        split_arrs.append(np.vstack(arrs_list))
+    total_arrs.append(split_arrs)
+
+# Testing to make sure outputs are organized as planned
+print(len(total_arrs))
+print(total_arrs[0][0].shape)
+print(total_arrs[0][0])
 
 
 # ************************************************************
