@@ -18,7 +18,7 @@ class TermsDataset(Dataset):
         self.one_hot = one_hot # Choice of whether or not to do one-hot encoding
 
         # Preparing/Organizing the data
-        self.data, self.tags = self.prep_data()
+        self.data, self.tags, self.words_total, self.tags_total, self.POS_total = self.prep_data()
         # Creating the vocabulary
         self.tok_int, self.int_tok, self.just_words, self.just_tags, self.just_pos, self.just_bool = self.create_vocab()
         # Encoding the data
@@ -42,17 +42,30 @@ class TermsDataset(Dataset):
     def prep_data(self):
         '''
         Function to read the data from the files and organized it with additional features
-        - Returns: list of data and list of hypothesized term tags
+        - Returns:
+            * Important for creation of the data inputs and hypothesized outputs
+            - data_final: list of data for the chosen data split
+            - tags_final: list of hypothesized term tags for the chosen data split
+            * Important for the creation of the vocabulary in the create_vocab() fxn
+                - must include data from all data splits so the encoding/decoding values are identical between splits
+            - words_total: all of the words for all of the data splits combined
+            - tags_total: all of the term tags for all of the data splits combined
+            - POS_total: all of the POS tags for all of the data splits combined
         '''
-        data_paths = []
-        data_final = []
-        tags_final = []
+        data_paths = [] # All of the data paths for all of the data splits combined
+        data_final = [] # All of the data for the chosen data split [train, dev, test]
+        tags_final = [] # All of the term tags for the chosen data split [train, dev, test]
+
+        words_total = [] # All of the words for all of the data splits combined
+        tags_total = [] # All of the term tags for all of the data splits combined
+        POS_total = [] # All of the POS tags for all of the data splits combined
+
         # Collecting all of the final annotation files
         for root, dirs, files in os.walk(self.directory):
             for file in sorted(files):
                 if file.endswith('.final'):
-                    if self.split in root:
-                        data_paths.append(os.path.join(root, file))
+                    #if self.split in root:
+                    data_paths.append(os.path.join(root, file))
 
         # Preprocessing loop
         for fpath in data_paths:
@@ -86,30 +99,39 @@ class TermsDataset(Dataset):
             for token in doc:
                 POS_list.append(token.pos_)
 
-            # Creating a dictionary of features for each input
+            for word in words:
+                words_total.append(word)
+            for tag in doc_tags:
+                tags_total.append(tag)
+            for pos in POS_list:
+                POS_total.append(pos)
+
+            # Creating a dictionary of features for each input (ONLY FOR THE CHOSEN DATA SPLIT)
             # - we can experiment with these features and definitely add more as we think of them
             # - ** if we change the features, the create_vocab() and one_hot_encode_data() fxns will need to be updated accordingly
-            for index, word in enumerate(words):
-                # Inputs dictionary: contains all input information for a given split
-                inputs = {}
-                # Adding all of the information to the inputs dictionary
-                inputs['Main word'] = word
-                inputs['Main POS'] = POS_list[index]
-                inputs['is_first'] = 'True' if index == 0 else 'False'
-                inputs['is_capitalized'] = 'True' if word.lower() != word else 'False'
-                inputs['Preceding word'] = '<BOS>' if index == 0 else words[index - 1]
-                inputs['Preceding POS'] = '---' if index == 0 else POS_list[index - 1]
-                inputs['Preceding Tag'] = '---' if index == 0 else doc_tags[index - 1]
-                inputs['Following word'] = '<EOS>' if index == len(words) - 1 else words[index + 1]
-                inputs['Following POS'] = '---' if index == len(words) - 1 else POS_list[index + 1]
-                inputs['Following Tag'] = '---' if index == len(words) - 1 else doc_tags[index + 1]
-                data_final.append(inputs)
+            if self.split in fpath: # Making sure to only organize data for the chosen data split
+                for index, word in enumerate(words):
+                    # Inputs dictionary: contains all input information for a given document
+                    inputs = {}
+                    # Adding all of the information to the inputs dictionary
+                    inputs['Main word'] = word
+                    inputs['Main POS'] = POS_list[index]
+                    inputs['is_first'] = 'True' if index == 0 else 'False'
+                    inputs['is_capitalized'] = 'True' if word.lower() != word else 'False'
+                    inputs['Preceding word'] = '<BOS>' if index == 0 else words[index - 1]
+                    inputs['Preceding POS'] = '---' if index == 0 else POS_list[index - 1]
+                    inputs['Preceding Tag'] = '---' if index == 0 else doc_tags[index - 1]
+                    inputs['Following word'] = '<EOS>' if index == len(words) - 1 else words[index + 1]
+                    inputs['Following POS'] = '---' if index == len(words) - 1 else POS_list[index + 1]
+                    inputs['Following Tag'] = '---' if index == len(words) - 1 else doc_tags[index + 1]
+                    # Appending one input to the data list
+                    data_final.append(inputs)
 
-            # Adding the tags from one document to list of tags for data split (train, dev, or test)
-            for tag in doc_tags:
-                tags_final.append(tag)
+                # Adding the tags from one document to list of tags for data split (train, dev, or test)
+                for tag in doc_tags:
+                    tags_final.append(tag)
 
-        return data_final, tags_final
+        return data_final, tags_final, words_total, tags_total, POS_total
 
     def create_vocab(self):
         '''
@@ -123,11 +145,11 @@ class TermsDataset(Dataset):
             - just_bool: List of all of the unique boolean values [True, False]
         '''
 
-        vocab = []
+        vocab = [] # total vocab of train, test and split sets
         # Used separate lists here just to organize things a bit more
-        just_words = [] # List of all unique words
-        just_tags = [] # List of all unique term tags
-        just_pos = [] # List of all unique POS tags
+        just_words = self.words_total # List of all unique words
+        just_tags = self.tags_total # List of all unique term tags
+        just_pos = self.POS_total # List of all unique POS tags
         just_bool = ['False', 'True']
 
 
@@ -141,12 +163,13 @@ class TermsDataset(Dataset):
                 elif 'tag' in key.lower():
                     just_tags.append(input[key])
 
+        just_bool = ['False', 'True']
         just_words = sorted(list(set(just_words)))
-        just_pos = sorted(list(set(just_pos)))
         just_tags = sorted(list(set(just_tags)))
+        just_POS = sorted(list(set(just_pos)))
 
         # Converting the vocabulary to token:integer dictionary
-        vocab = just_bool + just_tags + just_pos + just_words
+        vocab = just_bool + just_tags + just_POS + just_words
         tok_int = {'<PAD>': 9000, '<BOS>': 1, '<EOS>': 2, '<UNK>': 3}
         for index, item in enumerate(vocab):
             if item not in tok_int.keys():
@@ -162,7 +185,7 @@ class TermsDataset(Dataset):
 
         int_tok = {v: k for k, v in tok_int.items()}
 
-        return tok_int, int_tok, just_words, just_tags, just_pos, just_bool
+        return tok_int, int_tok, just_words, just_tags, just_POS, just_bool
 
     def encode_data(self):
         '''
@@ -209,7 +232,7 @@ class TermsDataset(Dataset):
                     arr = np.zeros(len(self.just_bool))
                     arr[self.just_bool.index(self.int_tok[input[key]])] = 1
                     arrs_list.append(arr)
-            data_arrs.append(np.hstack(arrs_list).reshape(3, -1))  # Append the arrays from one document to list of arrays for a dataset split & reshape
+            data_arrs.append(np.hstack(arrs_list).reshape(6, -1))  # Append the arrays from one document to list of arrays for a dataset split & reshape
 
         # Transform the hypothesis tags into numpy arrays
         tag_arrs = []
@@ -224,4 +247,4 @@ class TermsDataset(Dataset):
 split = 'train'
 dataset = TermsDataset(directory, split, one_hot=True)
 #print(len(dataset))
-#print(dataset[0])
+#print(dataset[0][0].shape)
