@@ -199,10 +199,10 @@ class TermsDataset(Dataset):
             single_input = []
             for item in input:
                 single_input.append(input[item])
-            data_encoded.append(np.array(single_input))
+            data_encoded.append(torch.tensor(single_input))
 
         for tag in self.tags:
-            tags_encoded.append(np.array(tag))
+            tags_encoded.append(torch.tensor(tag))
 
         return data_encoded, tags_encoded
 
@@ -217,27 +217,27 @@ class TermsDataset(Dataset):
             arrs_list = []  # List of arrays for one document
             for key in input:
                 if 'word' in key.lower():
-                    arr = np.zeros(len(self.just_words))
+                    arr = torch.zeros(len(self.just_words))
                     arr[self.just_words.index(self.int_tok[input[key]])] = 1
                     arrs_list.append(arr)
                 if 'tag' in key.lower():
-                    arr = np.zeros(len(self.just_tags))
+                    arr = torch.zeros(len(self.just_tags))
                     arr[self.just_tags.index(self.int_tok[input[key]])] = 1
                     arrs_list.append(arr)
                 if 'pos' in key.lower():
-                    arr = np.zeros(len(self.just_pos))
+                    arr = torch.zeros(len(self.just_pos))
                     arr[self.just_pos.index(self.int_tok[input[key]])] = 1
                     arrs_list.append(arr)
                 if 'is' in key.lower():
-                    arr = np.zeros(len(self.just_bool))
+                    arr = torch.zeros(len(self.just_bool))
                     arr[self.just_bool.index(self.int_tok[input[key]])] = 1
                     arrs_list.append(arr)
-            data_arrs.append(np.hstack(arrs_list).reshape(6, -1))  # Append the arrays from one document to list of arrays for a dataset split & reshape
+            data_arrs.append(torch.hstack(arrs_list).reshape(6, -1))  # Append the arrays from one document to list of arrays for the dataset split & reshape
 
         # Transform the hypothesis tags into numpy arrays
         tag_arrs = []
         for index, tag in enumerate(self.tags):
-            tag_arr = np.zeros(len(self.just_tags))
+            tag_arr = torch.zeros(len(self.just_tags), dtype=float)
             tag_arr[self.just_tags.index(self.int_tok[tag])] = 1
             tag_arrs.append(tag_arr)
 
@@ -246,5 +246,7 @@ class TermsDataset(Dataset):
 
 split = 'train'
 dataset = TermsDataset(directory, split, one_hot=True)
-#print(len(dataset))
-#print(dataset[0][0].shape)
+print(f'{len(dataset)} inputs in {split} dataset')
+input_tensor, tag_tensor = dataset[0]
+print(input_tensor)
+print(tag_tensor)
