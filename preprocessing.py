@@ -9,6 +9,7 @@ from torch.utils.data import Dataset, DataLoader
 nlp = spacy.load('en_core_web_sm')
 
 directory = '.../terminology-project-2022' # Path to the annotated terminology project data
+vocab_path = '/.../' # Path where you want the vocabularies to be saved (so data can be decoded later if we want)
 
 class TermsDataset(Dataset):
 
@@ -83,7 +84,7 @@ class TermsDataset(Dataset):
                     try:
                         word, tag = line.split('\t')
                     except ValueError:
-                        word, tag = line.split(' ')
+                        word, tag = line.split()
                     tag = ''.join(tag.split())
                     if word != '' and tag != '':
                         words.append(word)
@@ -185,6 +186,13 @@ class TermsDataset(Dataset):
 
         int_tok = {v: k for k, v in tok_int.items()}
 
+        # Saving the int_tok and tok_int vocabularies so we can decode the data later if we want to
+        with open(f'{vocab_path}/vocab_tok-int.json', 'w+') as file:
+            json.dump(tok_int, file)
+
+        with open(f'{vocab_path}/vocab_int-tok.json', 'w+') as file:
+            json.dump(int_tok, file)
+
         return tok_int, int_tok, just_words, just_tags, just_POS, just_bool
 
     def encode_data(self):
@@ -232,7 +240,8 @@ class TermsDataset(Dataset):
                     arr = torch.zeros(len(self.just_bool))
                     arr[self.just_bool.index(self.int_tok[input[key]])] = 1
                     arrs_list.append(arr)
-            data_arrs.append(torch.hstack(arrs_list).reshape(6, -1))  # Append the arrays from one document to list of arrays for the dataset split & reshape
+            # May need to change reshape value if gitlab dataset gets updated with more inputs
+            data_arrs.append(torch.hstack(arrs_list).reshape(5, -1))  # Append the arrays from one document to list of arrays for the dataset split & reshape
 
         # Transform the hypothesis tags into numpy arrays
         tag_arrs = []
@@ -250,3 +259,12 @@ print(f'{len(dataset)} inputs in {split} dataset')
 input_tensor, tag_tensor = dataset[0]
 print(input_tensor)
 print(tag_tensor)
+
+# Testing to make sure data works with DataLoader
+'''
+text_dataloader = DataLoader(dataset, batch_size=5, shuffle=True)
+batch_data, batch_name = next(iter(text_dataloader))
+print(batch_data.shape)
+print(batch_name.shape)
+print(batch_name)
+'''
