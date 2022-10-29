@@ -80,7 +80,10 @@ class TermsDataset(Dataset):
 
             # Splitting the txt file into the word and tag lists
             for line in text:
-                if line != '\n' and line != '':
+                if line == '\n':
+                    words.append('<EOS>')
+                    doc_tags.append('O')
+                elif line != '\n' and line != '':
                     try:
                         word, tag = line.split('\t')
                     except ValueError:
@@ -112,21 +115,22 @@ class TermsDataset(Dataset):
             # - ** if we change the features, the create_vocab() and one_hot_encode_data() fxns will need to be updated accordingly
             if self.split in fpath: # Making sure to only organize data for the chosen data split
                 for index, word in enumerate(words):
-                    # Inputs dictionary: contains all input information for a given document
-                    inputs = {}
-                    # Adding all of the information to the inputs dictionary
-                    inputs['Main word'] = word
-                    inputs['Main POS'] = POS_list[index]
-                    inputs['is_first'] = 'True' if index == 0 else 'False'
-                    inputs['is_capitalized'] = 'True' if word.lower() != word else 'False'
-                    inputs['Preceding word'] = '<BOS>' if index == 0 else words[index - 1]
-                    inputs['Preceding POS'] = '---' if index == 0 else POS_list[index - 1]
-                    inputs['Preceding Tag'] = '---' if index == 0 else doc_tags[index - 1]
-                    inputs['Following word'] = '<EOS>' if index == len(words) - 1 else words[index + 1]
-                    inputs['Following POS'] = '---' if index == len(words) - 1 else POS_list[index + 1]
-                    inputs['Following Tag'] = '---' if index == len(words) - 1 else doc_tags[index + 1]
-                    # Appending one input to the data list
-                    data_final.append(inputs)
+                    if word != '<EOS>':
+                        # Inputs dictionary: contains all input information for a given document
+                        inputs = {}
+                        # Adding all of the information to the inputs dictionary
+                        inputs['Main word'] = word
+                        inputs['Main POS'] = POS_list[index]
+                        inputs['is_first'] = 'True' if index == 0 or words[index - 1] == '<EOS>' else 'False'
+                        inputs['is_capitalized'] = 'True' if word.lower() != word else 'False'
+                        inputs['Preceding word'] = '<BOS>' if index == 0 or words[index - 1] == '<EOS>' else words[index - 1]
+                        inputs['Preceding POS'] = 'X' if index == 0 or words[index - 1] == '<EOS>' else POS_list[index - 1]
+                        inputs['Preceding Tag'] = 'O' if index == 0 or words[index - 1] == '<EOS>' else doc_tags[index - 1]
+                        inputs['Following word'] = '<EOS>' if index == len(words) - 1 else words[index + 1]
+                        inputs['Following POS'] = 'X' if index == len(words) - 1 else POS_list[index + 1]
+                        inputs['Following Tag'] = 'O' if index == len(words) - 1 else doc_tags[index + 1]
+                        # Appending one input to the data list
+                        data_final.append(inputs)
 
                 # Adding the tags from one document to list of tags for data split (train, dev, or test)
                 for tag in doc_tags:
