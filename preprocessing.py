@@ -91,7 +91,13 @@ class TermsDataset(Dataset):
                     tag = ''.join(tag.split())
                     if word != '' and tag != '':
                         words.append(word)
-                        doc_tags.append(tag)
+                        # Added these statements below to deal with inconsistencies in annotations
+                        if 'B' in tag.upper():
+                            doc_tags.append('B')
+                        elif 'I' in tag.upper():
+                            doc_tags.append('I')
+                        elif 'O' in tag.upper() or '0' in tag:
+                            doc_tags.append('O')
                     elif word == '' and tag == '':
                         continue
                     elif word != '' and tag == '':
@@ -244,13 +250,13 @@ class TermsDataset(Dataset):
                     arr = torch.zeros(len(self.just_bool))
                     arr[self.just_bool.index(self.int_tok[input[key]])] = 1
                     arrs_list.append(arr)
-            # May need to change reshape value if gitlab dataset gets updated with more inputs
-            data_arrs.append(torch.hstack(arrs_list).reshape(5, -1))  # Append the arrays from one document to list of arrays for the dataset split & reshape
+            # Append the arrays from one document to list of arrays for the dataset split & reshape
+            data_arrs.append(torch.cat(arrs_list)) # .reshape(5, -1)) <- Could reshape tensor if we want, but I don't know if it would be helpful or necessary
 
         # Transform the hypothesis tags into numpy arrays
         tag_arrs = []
         for index, tag in enumerate(self.tags):
-            tag_arr = torch.zeros(len(self.just_tags), dtype=float)
+            tag_arr = torch.zeros(len(self.just_tags))
             tag_arr[self.just_tags.index(self.int_tok[tag])] = 1
             tag_arrs.append(tag_arr)
 
