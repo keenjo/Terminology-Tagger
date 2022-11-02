@@ -21,7 +21,7 @@ class TermsDataset(Dataset):
         # Preparing/Organizing the data
         self.data, self.tags, self.words_total, self.tags_total, self.POS_total = self.prep_data()
         # Creating the vocabulary
-        self.tok_int, self.int_tok, self.just_words, self.just_tags, self.just_pos, self.just_bool = self.create_vocab()
+        self.word_int, self.tag_int, self.pos_int, self.bool_int = self.create_vocab()
         # Encoding the data
         if self.one_hot == False:
             '''
@@ -118,7 +118,7 @@ class TermsDataset(Dataset):
 
             # Creating a dictionary of features for each input (ONLY FOR THE CHOSEN DATA SPLIT)
             # - we can experiment with these features and definitely add more as we think of them
-            # - ** if we change the features, the create_vocab() and one_hot_encode_data() fxns will need to be updated accordingly
+            # - ** if we change the features, the create_vocab() and data encoding fxns will need to be updated accordingly
             if self.split in fpath: # Making sure to only organize data for the chosen data split
                 for index, word in enumerate(words):
                     if word != '<EOS>':
@@ -127,8 +127,8 @@ class TermsDataset(Dataset):
                         # Adding all of the information to the inputs dictionary
                         inputs['Main word'] = word
                         inputs['Main POS'] = POS_list[index]
-                        inputs['is_first'] = 'True' if index == 0 or words[index - 1] == '<EOS>' else 'False'
-                        inputs['is_capitalized'] = 'True' if word.lower() != word else 'False'
+                        inputs['is_first'] = True if index == 0 or words[index - 1] == '<EOS>' else False
+                        inputs['is_capitalized'] = True if word.lower() != word else False
                         inputs['Preceding word'] = '<BOS>' if index == 0 or words[index - 1] == '<EOS>' else words[index - 1]
                         inputs['Preceding POS'] = 'X' if index == 0 or words[index - 1] == '<EOS>' else POS_list[index - 1]
                         inputs['Preceding Tag'] = 'O' if index == 0 or words[index - 1] == '<EOS>' else doc_tags[index - 1]
@@ -146,127 +146,115 @@ class TermsDataset(Dataset):
 
     def create_vocab(self):
         '''
-        Creating a vocabulary for all of the data
+        Creating a vocabulary for each feature of the data
         - Returns:
-            - tok_int: dictionary mapping tokens to integers
-            - int_tok: inverse of tok_int mapping integers to tokens
-            - just_words: List of all of the unique words
-            - just_tags: List of all of the unique Term tags
-            - just_pos: List of all of the unique POS tags
-            - just_bool: List of all of the unique boolean values [True, False]
+            - word_int: dictionary mapping possible words from annotated dataset to integers
+            - tag_int: dictionary mapping possible term tags from annotated dataset to integers
+            - pos_int: dictionary mapping possible POS tags from feature dictionary to integers
+            - bool_int: dictionary mapping possible boolean values from feature dictionary to integers
         '''
 
-        vocab = [] # total vocab of train, test and split sets
         # Used separate lists here just to organize things a bit more
-        just_words = self.words_total # List of all unique words
-        just_tags = self.tags_total # List of all unique term tags
-        just_pos = self.POS_total # List of all unique POS tags
-        just_bool = ['False', 'True']
-
-
-        for input in self.data:
-            for key in input:
-                vocab.append(input[key])
-                if 'word' in key.lower():
-                    just_words.append(input[key])
-                elif 'pos' in key.lower():
-                    just_pos.append(input[key])
-                elif 'tag' in key.lower():
-                    just_tags.append(input[key])
-
-        just_bool = ['False', 'True']
-        just_words = sorted(list(set(just_words)))
-        just_tags = sorted(list(set(just_tags)))
-        just_POS = sorted(list(set(just_pos)))
+        just_words = sorted(list(set(self.words_total))) # List of all unique words
+        just_tags = sorted(list(set(self.tags_total))) # List of all unique term tags
+        just_pos = sorted(list(set(self.POS_total))) # List of all unique POS tags
+        just_bool = [False, True]
 
         # Converting the vocabulary to token:integer dictionary
-        vocab = just_bool + just_tags + just_POS + just_words
-        tok_int = {'<PAD>': 9000, '<BOS>': 1, '<EOS>': 2, '<UNK>': 3}
-        for index, item in enumerate(vocab):
-            if item not in tok_int.keys():
-                tok_int[item] = index + 4 # + 4 so we avoid values repeating with the defaults in tok_int just above
+        word_int = {'<UNK>': 0, '<BOS>': 1, '<EOS>': 2}
+        count = 0
+        for item in just_words:
+            if item not in word_int.keys():
+                word_int[item] = count + 3 # + 3 so we avoid values repeating with the defaults in tok_int just above
+                count += 1
 
-        # Updating the data and tag dictionaries with the vocabulary integer values
-        for input in self.data:
-            for key in input:
-                input[key] = tok_int[input[key]]
+        tag_int = {}
+        for index, item in enumerate(just_tags):
+            if item not in tag_int.keys():
+                tag_int[item] = index
 
-        for index, tag in enumerate(self.tags):
-            self.tags[index] = tok_int[tag]
+        pos_int = {}
+        for index, item in enumerate(just_pos):
+            if item not in pos_int.keys():
+                pos_int[item] = index
 
-        int_tok = {v: k for k, v in tok_int.items()}
+        bool_int = {False: 0, True: 1}
 
-        # Saving the int_tok and tok_int vocabularies so we can decode the data later if we want to
+        total_dicts = {'Word dict': word_int,
+                       'Tag dict': tag_int,
+                       'POS dict': pos_int,
+                       'Bool dict': bool_int}
+        #int_tok = {v: k for k, v in word_int.items()}
+
+        # Saving the tok_int vocabularies so we can decode the data later if we want to
         with open(f'{vocab_path}/vocab_tok-int.json', 'w+') as file:
-            json.dump(tok_int, file)
+            json.dump(total_dicts, file)
 
-        with open(f'{vocab_path}/vocab_int-tok.json', 'w+') as file:
-            json.dump(int_tok, file)
-
-        return tok_int, int_tok, just_words, just_tags, just_POS, just_bool
+        return word_int, tag_int, pos_int, bool_int
 
     def encode_data(self):
         '''
-        Function to encode the data as a vector which is the size of the number of features
-        - Returns: encoded data (inputs) and encoded term tags (hypothesis outputs)
+        Function to encode each input as a tensor
+        - Returns: encoded data (inputs) and encoded term tag labels (expected outputs)
         '''
         data_encoded = []
-        tags_encoded = []
 
         for input in self.data:
-            single_input = []
-            for item in input:
-                single_input.append(input[item])
-            data_encoded.append(torch.tensor(single_input))
+            tensor_list = []
+            for key, value in input.items():
+                if 'word' in key.lower():
+                    val = self.word_int[value]
+                    tensor_list.append(val)
+                elif 'tag' in key.lower():
+                    val = self.tag_int[value]
+                    tensor_list.append(val)
+                elif 'pos' in key.lower():
+                    val = self.pos_int[value]
+                    tensor_list.append(val)
+                elif 'is' in key.lower():
+                    val = self.bool_int[value]
+                    tensor_list.append(val)
+            data_encoded.append(torch.tensor(tensor_list))
 
-        for tag in self.tags:
-            tags_encoded.append(torch.tensor(tag))
+        tags_encoded = [torch.tensor(self.tag_int[x]) for x in self.tags]
 
         return data_encoded, tags_encoded
 
     def one_hot_encode_data(self):
         '''
         Function to one-hot encode the data
-        - Returns: encoded data (inputs) and encoded term tags (hypothesis outputs)
+        - Returns: encoded data (inputs) and encoded term tag labels (expected outputs)
         '''
-        data_arrs = []  # List of all of the final arrays
+        data_one_hot = []
 
         for input in self.data:
-            arrs_list = []  # List of arrays for one document
-            for key in input:
+            tensor_list = []
+            for key, value in input.items():
                 if 'word' in key.lower():
-                    arr = torch.zeros(len(self.just_words))
-                    arr[self.just_words.index(self.int_tok[input[key]])] = 1
-                    arrs_list.append(arr)
-                if 'tag' in key.lower():
-                    arr = torch.zeros(len(self.just_tags))
-                    arr[self.just_tags.index(self.int_tok[input[key]])] = 1
-                    arrs_list.append(arr)
-                if 'pos' in key.lower():
-                    arr = torch.zeros(len(self.just_pos))
-                    arr[self.just_pos.index(self.int_tok[input[key]])] = 1
-                    arrs_list.append(arr)
-                if 'is' in key.lower():
-                    arr = torch.zeros(len(self.just_bool))
-                    arr[self.just_bool.index(self.int_tok[input[key]])] = 1
-                    arrs_list.append(arr)
-            # Append the arrays from one document to list of arrays for the dataset split & reshape
-            data_arrs.append(torch.cat(arrs_list)) # .reshape(5, -1)) <- Could reshape tensor if we want, but I don't know if it would be helpful or necessary
+                    val = torch.nn.functional.one_hot(torch.tensor(self.word_int[value]), num_classes=len(self.word_int))
+                    tensor_list.append(val)
+                elif 'tag' in key.lower():
+                    val = torch.nn.functional.one_hot(torch.tensor(self.tag_int[value]), num_classes=len(self.tag_int))
+                    tensor_list.append(val)
+                elif 'pos' in key.lower():
+                    val = torch.nn.functional.one_hot(torch.tensor(self.pos_int[value]), num_classes=len(self.pos_int))
+                    tensor_list.append(val)
+                elif 'is' in key.lower():
+                    val = torch.nn.functional.one_hot(torch.tensor(self.bool_int[value]), num_classes=len(self.bool_int))
+                    tensor_list.append(val)
+            data_one_hot.append(torch.cat(tensor_list).reshape(4, -1))
 
-        # Transform the hypothesis tags into numpy arrays
-        tag_arrs = []
-        for index, tag in enumerate(self.tags):
-            tag_arr = torch.zeros(len(self.just_tags))
-            tag_arr[self.just_tags.index(self.int_tok[tag])] = 1
-            tag_arrs.append(tag_arr)
+        tags_one_hot = [torch.nn.functional.one_hot(torch.tensor(self.tag_int[x]), num_classes=len(self.tag_int)) for x in self.tags]
 
-        return data_arrs, tag_arrs
+        return data_one_hot, tags_one_hot
+
 
 
 split = 'train'
-dataset = TermsDataset(directory, split, one_hot=True)
+dataset = TermsDataset(directory, split, one_hot=False)
 print(f'{len(dataset)} inputs in {split} dataset')
 input_tensor, tag_tensor = dataset[0]
+print(input_tensor.shape)
 print(input_tensor)
 print(tag_tensor)
 
