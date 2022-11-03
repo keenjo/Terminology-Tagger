@@ -128,13 +128,12 @@ class TermsDataset(Dataset):
                         inputs['Main word'] = word
                         inputs['Main POS'] = POS_list[index]
                         inputs['is_first'] = True if index == 0 or words[index - 1] == '<EOS>' else False
-                        inputs['is_capitalized'] = True if word.lower() != word else False
+                        inputs['is_capitalized_first'] = True if word[0].lower() != word[0] else False
+                        inputs['is_capitalized_within'] = True if word[1:].lower() != word [1:] else False
                         inputs['Preceding word'] = '<BOS>' if index == 0 or words[index - 1] == '<EOS>' else words[index - 1]
                         inputs['Preceding POS'] = 'X' if index == 0 or words[index - 1] == '<EOS>' else POS_list[index - 1]
-                        inputs['Preceding Tag'] = 'O' if index == 0 or words[index - 1] == '<EOS>' else doc_tags[index - 1]
                         inputs['Following word'] = '<EOS>' if index == len(words) - 1 else words[index + 1]
                         inputs['Following POS'] = 'X' if index == len(words) - 1 else POS_list[index + 1]
-                        inputs['Following Tag'] = 'O' if index == len(words) - 1 else doc_tags[index + 1]
                         # Appending one input to the data list
                         data_final.append(inputs)
 
@@ -188,7 +187,7 @@ class TermsDataset(Dataset):
 
         # Saving the tok_int vocabularies so we can decode the data later if we want to
         with open(f'{vocab_path}/vocab_tok-int.json', 'w+') as file:
-            json.dump(total_dicts, file)
+            json.dump(total_dicts, file, ensure_ascii=False)
 
         return word_int, tag_int, pos_int, bool_int
 
@@ -204,9 +203,6 @@ class TermsDataset(Dataset):
             for key, value in input.items():
                 if 'word' in key.lower():
                     val = self.word_int[value]
-                    tensor_list.append(val)
-                elif 'tag' in key.lower():
-                    val = self.tag_int[value]
                     tensor_list.append(val)
                 elif 'pos' in key.lower():
                     val = self.pos_int[value]
@@ -233,9 +229,6 @@ class TermsDataset(Dataset):
                 if 'word' in key.lower():
                     val = torch.nn.functional.one_hot(torch.tensor(self.word_int[value]), num_classes=len(self.word_int))
                     tensor_list.append(val)
-                elif 'tag' in key.lower():
-                    val = torch.nn.functional.one_hot(torch.tensor(self.tag_int[value]), num_classes=len(self.tag_int))
-                    tensor_list.append(val)
                 elif 'pos' in key.lower():
                     val = torch.nn.functional.one_hot(torch.tensor(self.pos_int[value]), num_classes=len(self.pos_int))
                     tensor_list.append(val)
@@ -254,7 +247,7 @@ split = 'train'
 dataset = TermsDataset(directory, split, one_hot=False)
 print(f'{len(dataset)} inputs in {split} dataset')
 input_tensor, tag_tensor = dataset[0]
-print(input_tensor.shape)
+print(f'Input Tensor Shape: {input_tensor.shape}')
 print(input_tensor)
 print(tag_tensor)
 
