@@ -82,7 +82,7 @@ class TermsDataset(Dataset):
             # Splitting the txt file into the word and tag lists
             for line in text:
                 if line == '\n':
-                    words.append('<EOS>')
+                    words.append('XX')
                     doc_tags.append('O')
                 elif line != '\n' and line != '':
                     try:
@@ -110,6 +110,11 @@ class TermsDataset(Dataset):
             for token in doc:
                 POS_list.append(token.pos_)
 
+            # Change XX to <EOS>
+            # Originally used XX rather than <EOS> to avoid messing with the tokenization when finding POS just above
+            for index, word in enumerate(words):
+                if word == 'XX':
+                    words[index] = '<EOS>'
             for word in words:
                 words_total.append(word)
             for tag in doc_tags:
@@ -158,7 +163,7 @@ class TermsDataset(Dataset):
         just_bool = [False, True]
 
         # Converting the vocabulary to token:integer dictionary
-        word_int = {'<UNK>': 0, '<BOS>': 1, '<EOS>': 2}
+        word_int = {'<UNK>': -10, '<BOS>': 1, '<EOS>': 2}
         count = 0
         for item in just_words:
             if item not in word_int.keys():
