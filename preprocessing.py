@@ -235,7 +235,7 @@ class TermsDataset(Dataset):
                 elif 'is' in key.lower():
                     val = torch.nn.functional.one_hot(torch.tensor(self.bool_int[value]), num_classes=len(self.bool_int))
                     tensor_list.append(val)
-            data_one_hot.append(torch.cat(tensor_list).reshape(4, -1))
+            data_one_hot.append(torch.cat(tensor_list))
 
         tags_one_hot = [torch.nn.functional.one_hot(torch.tensor(self.tag_int[x]), num_classes=len(self.tag_int)) for x in self.tags]
 
