@@ -13,10 +13,11 @@ vocab_path = '/.../' # Path where you want the vocabularies to be saved (so data
 
 class TermsDataset(Dataset):
 
-    def __init__(self, directory, split, one_hot=False):
+    def __init__(self, directory, vocab_path, split, one_hot=False):
         self.directory = directory # Directory where data is stored
         self.split = split # Dataset split -> train, dev, or test
         self.one_hot = one_hot # Choice of whether or not to do one-hot encoding
+        self.vocab_path = vocab_path # Directory where vocab will be saved
 
         # Preparing/Organizing the data
         self.data, self.tags, self.words_total, self.tags_total, self.POS_total = self.prep_data()
@@ -136,10 +137,7 @@ class TermsDataset(Dataset):
                         inputs['Following POS'] = 'X' if index == len(words) - 1 else POS_list[index + 1]
                         # Appending one input to the data list
                         data_final.append(inputs)
-
-                # Adding the tags from one document to list of tags for data split (train, dev, or test)
-                for tag in doc_tags:
-                    tags_final.append(tag)
+                        tags_final.append(doc_tags[index])
 
         return data_final, tags_final, words_total, tags_total, POS_total
 
@@ -186,7 +184,7 @@ class TermsDataset(Dataset):
         #int_tok = {v: k for k, v in word_int.items()}
 
         # Saving the tok_int vocabularies so we can decode the data later if we want to
-        with open(f'{vocab_path}/vocab_tok-int.json', 'w+') as file:
+        with open(f'{self.vocab_path}/vocab_tok-int.json', 'w+') as file:
             json.dump(total_dicts, file, ensure_ascii=False)
 
         return word_int, tag_int, pos_int, bool_int
@@ -244,7 +242,7 @@ class TermsDataset(Dataset):
 
 
 split = 'train'
-dataset = TermsDataset(directory, split, one_hot=False)
+dataset = TermsDataset(directory, vocab_path, split, one_hot=False)
 print(f'{len(dataset)} inputs in {split} dataset')
 input_tensor, tag_tensor = dataset[0]
 print(f'Input Tensor Shape: {input_tensor.shape}')
