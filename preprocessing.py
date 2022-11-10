@@ -8,8 +8,8 @@ from torch.utils.data import Dataset, DataLoader
 
 nlp = spacy.load('en_core_web_sm')
 
-directory = '.../terminology-project-2022' # Path to the annotated terminology project data
-vocab_path = '/.../' # Path where you want the vocabularies to be saved (so data can be decoded later if we want)
+directory = '/terminology-project-2022' # Path to the annotated terminology project data
+vocab_path = '/[ENTER DESIRED PATH]/' # Path where you want the vocabularies to be saved (so data can be decoded later if we want)
 
 class TermsDataset(Dataset):
 
