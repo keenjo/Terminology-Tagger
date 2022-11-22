@@ -82,7 +82,7 @@ class TermsDataset(Dataset):
             # Splitting the txt file into the word and tag lists
             for line in text:
                 if line == '\n':
-                    words.append('XX')
+                    words.append('#')
                     doc_tags.append('O')
                 elif line != '\n' and line != '':
                     try:
@@ -108,12 +108,15 @@ class TermsDataset(Dataset):
             # Getting the POS tags of all of the words
             doc = nlp(' '.join(words))
             for token in doc:
-                POS_list.append(token.pos_)
+                if str(token) != '#':
+                    POS_list.append(token.pos_)
+                else:
+                    POS_list.append('X')
 
-            # Change XX to <EOS>
+            # Change # to <EOS>
             # Originally used XX rather than <EOS> to avoid messing with the tokenization when finding POS just above
             for index, word in enumerate(words):
-                if word == 'XX':
+                if word == '#':
                     words[index] = '<EOS>'
             for word in words:
                 words_total.append(word)
@@ -246,7 +249,7 @@ class TermsDataset(Dataset):
 
 
 
-split = 'train'
+split = 'train' # train, test, or dev
 dataset = TermsDataset(directory, vocab_path, split, one_hot=False)
 print(f'{len(dataset)} inputs in {split} dataset')
 input_tensor, tag_tensor = dataset[0]
