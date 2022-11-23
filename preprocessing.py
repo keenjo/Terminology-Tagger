@@ -107,14 +107,16 @@ class TermsDataset(Dataset):
 
             # Getting the POS tags of all of the words
             doc = nlp(' '.join(words))
-            for token in doc:
+            for index, token in enumerate(doc):
                 if str(token) != '#':
                     POS_list.append(token.pos_)
+                    if str(token.lemma_) != words[index].lower():
+                        words[index] = str(token.lemma_)
                 else:
                     POS_list.append('X')
 
             # Change # to <EOS>
-            # Originally used XX rather than <EOS> to avoid messing with the tokenization when finding POS just above
+            # Originally used # rather than <EOS> to avoid messing with the tokenization when finding POS just above
             for index, word in enumerate(words):
                 if word == '#':
                     words[index] = '<EOS>'
