@@ -72,7 +72,7 @@ class TermsDataset(Dataset):
         # Preprocessing loop
         for fpath in data_paths:
             #print(fpath)
-            with open(fpath, 'r+') as f:
+            with open(fpath, 'r+', encoding='utf8') as f:
                 text = f.readlines()
 
             words = [] # all of the words for a given document
@@ -218,7 +218,7 @@ class TermsDataset(Dataset):
                 elif 'is' in key.lower():
                     val = self.bool_int[value]
                     tensor_list.append(val)
-            data_encoded.append(torch.tensor(tensor_list))
+            data_encoded.append(torch.tensor(tensor_list, dtype=torch.float))
 
         tags_encoded = [torch.tensor(self.tag_int[x]) for x in self.tags]
 
@@ -236,29 +236,33 @@ class TermsDataset(Dataset):
             for key, value in input.items():
                 if 'word' in key.lower():
                     val = torch.nn.functional.one_hot(torch.tensor(self.word_int[value]), num_classes=len(self.word_int))
+                    val.type(torch.float)
                     tensor_list.append(val)
                 elif 'pos' in key.lower():
                     val = torch.nn.functional.one_hot(torch.tensor(self.pos_int[value]), num_classes=len(self.pos_int))
+                    val.type(torch.float)
                     tensor_list.append(val)
                 elif 'is' in key.lower():
                     val = torch.nn.functional.one_hot(torch.tensor(self.bool_int[value]), num_classes=len(self.bool_int))
+                    val.type(torch.float)
                     tensor_list.append(val)
-            data_one_hot.append(torch.cat(tensor_list))
+            data_one_hot.append(torch.cat(tensor_list).type(torch.float))
 
-        tags_one_hot = [torch.nn.functional.one_hot(torch.tensor(self.tag_int[x]), num_classes=len(self.tag_int)) for x in self.tags]
+        tags_one_hot = [torch.nn.functional.one_hot(torch.tensor(self.tag_int[x]), num_classes=len(self.tag_int)).type(torch.float) for x in self.tags]
 
         return data_one_hot, tags_one_hot
 
 
-
+'''
 split = 'train' # train, test, or dev
-dataset = TermsDataset(directory, vocab_path, split, one_hot=False)
+dataset = TermsDataset(directory, vocab_path, split, one_hot=True)
 print(f'{len(dataset)} inputs in {split} dataset')
 input_tensor, tag_tensor = dataset[0]
 print(f'Input Tensor Shape: {input_tensor.shape}')
 print(input_tensor)
 print(tag_tensor)
-
+print(input_tensor.type())
+'''
 # Testing to make sure data works with DataLoader
 '''
 text_dataloader = DataLoader(dataset, batch_size=5, shuffle=True)
