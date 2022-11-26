@@ -22,7 +22,7 @@ dev_data = TermsDataset(directory, vocab_path, 'dev', one_hot=True)
 # Loading Data into DataLoader
 train_dataloader = DataLoader(train_data, batch_size=5, shuffle=True)
 test_dataloader = DataLoader(test_data, batch_size=5, shuffle=True)
-eval_dataloader = DataLoader(dev_data, batch_size=5, shuffle=True)
+dev_dataloader = DataLoader(dev_data, batch_size=5, shuffle=True)
 batch_data, batch_name = next(iter(train_dataloader))
 
 # Define model input size and final number of classes
@@ -52,7 +52,7 @@ class MLPClassif(nn.Module):
 
 
 # Training function
-def training_mlp_classifier(model, train_dataloader, num_epochs, loss_fn, learning_rate, verbose=True):
+def training_mlp_classifier(model, train_dataloader, val_dataloader, num_epochs, loss_fn, learning_rate, verbose=True):
     # Make a copy of the model (avoid changing the model outside this function)
     model_tr = copy.deepcopy(model)
 
@@ -83,7 +83,7 @@ def training_mlp_classifier(model, train_dataloader, num_epochs, loss_fn, learni
             loss_current_epoch += loss.item()
 
         # Checking validation accuracy at each epoch
-        accuracy = eval_mlp_classifier(model_tr, eval_dataloader)
+        accuracy = eval_mlp_classifier(model_tr, val_dataloader)
 
         # Early stopping implementation
         if accuracy_all_epochs != []:
@@ -147,7 +147,7 @@ lr = 0.01
 loss_fn = nn.CrossEntropyLoss()
 
 # Run training Loop
-model_tr, loss_all_epochs, accuracy_all_epochs = training_mlp_classifier(model, train_dataloader, num_epochs, loss_fn, lr)
+model_tr, loss_all_epochs, accuracy_all_epochs = training_mlp_classifier(model, train_dataloader, dev_dataloader, num_epochs, loss_fn, lr)
 
 # Save model
 #torch.save(model_tr.state_dict(), 'model_mlp_classif_trained.pt')
