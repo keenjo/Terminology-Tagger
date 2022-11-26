@@ -248,7 +248,8 @@ class TermsDataset(Dataset):
                     tensor_list.append(val)
             data_one_hot.append(torch.cat(tensor_list).type(torch.float))
 
-        tags_one_hot = [torch.nn.functional.one_hot(torch.tensor(self.tag_int[x]), num_classes=len(self.tag_int)).type(torch.float) for x in self.tags]
+        #tags_one_hot = [torch.nn.functional.one_hot(torch.tensor(self.tag_int[x]), num_classes=len(self.tag_int)).type(torch.float) for x in self.tags]
+        tags_one_hot = [torch.tensor(self.tag_int[x]) for x in self.tags]
 
         return data_one_hot, tags_one_hot
 
