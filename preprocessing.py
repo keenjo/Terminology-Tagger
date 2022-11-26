@@ -9,15 +9,14 @@ from torch.utils.data import Dataset, DataLoader
 nlp = spacy.load('en_core_web_sm')
 
 #directory = 'terminology-project-2022/' # Path to the annotated terminology project data
-#vocab_path = '/[ENTER DESIRED PATH]/' # Path where you want the vocabularies to be saved (so data can be decoded later if we want)
 
 class TermsDataset(Dataset):
 
-    def __init__(self, directory, vocab_path, split, one_hot=False):
+    def __init__(self, directory, split, one_hot=False):
         self.directory = directory # Directory where data is stored
         self.split = split # Dataset split -> train, dev, or test
         self.one_hot = one_hot # Choice of whether or not to do one-hot encoding
-        self.vocab_path = vocab_path # Directory where vocab will be saved
+        #self.vocab_path = vocab_path # Directory where vocab will be saved
 
         # Preparing/Organizing the data
         self.data, self.tags, self.words_total, self.tags_total, self.POS_total = self.prep_data()
@@ -194,8 +193,8 @@ class TermsDataset(Dataset):
         #int_tok = {v: k for k, v in word_int.items()}
 
         # Saving the tok_int vocabularies so we can decode the data later if we want to
-        with open(f'{self.vocab_path}/vocab_tok-int.json', 'w+') as file:
-            json.dump(total_dicts, file, ensure_ascii=False)
+        #with open(f'{self.vocab_path}/vocab_tok-int.json', 'w+') as file:
+            #json.dump(total_dicts, file, ensure_ascii=False)
 
         return word_int, tag_int, pos_int, bool_int
 
@@ -256,7 +255,7 @@ class TermsDataset(Dataset):
 
 '''
 split = 'train' # train, test, or dev
-dataset = TermsDataset(directory, vocab_path, split, one_hot=True)
+dataset = TermsDataset(directory, split, one_hot=True)
 print(f'{len(dataset)} inputs in {split} dataset')
 input_tensor, tag_tensor = dataset[0]
 print(f'Input Tensor Shape: {input_tensor.shape}')
