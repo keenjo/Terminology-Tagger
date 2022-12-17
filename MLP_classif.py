@@ -1,12 +1,6 @@
-import os
-import random
 import numpy as np
 import torch
-import torchvision
-import torchvision.transforms as transforms
 import torch.nn as nn
-import matplotlib.pyplot as plt
-from skimage import io, transform
 from torch.utils.data import DataLoader, WeightedRandomSampler, random_split, Subset
 import copy
 from tqdm import tqdm
@@ -14,20 +8,22 @@ from preprocessing import TermsDataset
 
 # Enter the directory to the dataset
 directory = 'terminology-project-2022/' # Path to the annotated terminology project data
+model_save_dir = 'models/model_MLP_classif.pt'
 
 # Model hyperparameters
 batch_size = 3 # size of the training batches
-num_epochs = 15 # number of training epochs
+num_epochs = 10 # number of training epochs
 lr = 0.01 # learning rate
 loss_fn = nn.CrossEntropyLoss() # loss function
 hidden_size = 32 # size of the hidden layer in the MLP
 
-#Creating train, test, and dev splits
+#Instantiating train, test, and dev splits
+print('Loading the data...')
 train_data = TermsDataset(directory, 'train', one_hot=True)
 test_data = TermsDataset(directory, 'test', one_hot=True)
 dev_data = TermsDataset(directory, 'dev', one_hot=True)
 
-# Getting label statistics for Random Sampler (to have a better distribution of classes in each batch)
+# Getting label statistics for Weighted Random Sampler (to have a better distribution of classes in each batch)
 # Splitting the data into two lists of data and labels
 train_split = list(zip(*train_data))
 test_split = list(zip(*test_data))
@@ -75,15 +71,27 @@ num_classes = 3
 class MLPClassif(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, act_fn):
         super(MLPClassif, self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.output_size = output_size
+        self.act_fn = act_fn
 
+        # input layer with activation function and Batch Normalization
         self.input_layer = nn.Sequential(nn.Linear(input_size, hidden_size),
                                          act_fn,
                                          nn.BatchNorm1d(num_features=hidden_size))
+
+        # hidden layer with activation function and Batch Normalization
         self.hidden_layer = nn.Sequential(nn.Linear(hidden_size, hidden_size),
                                           act_fn,
                                           nn.BatchNorm1d(num_features=hidden_size))
+
+        # output classification layer
+        # we do not add softmax actiavtion because the Pytorch Cross Entropy loss (that we use in training below)
+        # already changes the outputs to probabilities
         self.output_layer = nn.Sequential(nn.Linear(hidden_size, output_size))
 
+    # Training loop
     def forward(self, x):
         y = self.input_layer(x)
         z = self.hidden_layer(y)
@@ -102,7 +110,7 @@ def training_mlp_classifier(model, train_dataloader, val_dataloader, num_epochs,
     # Define the optimizer
     optimizer = torch.optim.SGD(model_tr.parameters(), lr=learning_rate)
 
-    # Initialize a list to record the training loss over epochs
+    # Initialize a list to record the training loss, validation accuracy, and validation loss over epochs
     loss_all_epochs = []
     accuracy_all_epochs = []
     val_loss_all_epochs = []
@@ -126,10 +134,10 @@ def training_mlp_classifier(model, train_dataloader, val_dataloader, num_epochs,
         # Checking validation accuracy, accuracy for each tag, and validation loss at each epoch
         accuracy, B_acc, I_acc, O_acc, val_loss = eval_mlp_classifier(model_tr, val_dataloader, loss_fn)
 
-        # Early stopping implementation
+        # Best performing model saving implementation
         if accuracy_all_epochs != []:
             if accuracy > max(accuracy_all_epochs):
-                torch.save(model_tr.state_dict(), 'models/model_MLP_classif.pt')
+                torch.save(model_tr.state_dict(), model_save_dir)
                 print(f'-----> Old Best Accuracy: {max(accuracy_all_epochs)}')
                 print(f'-----> Current Best Accuracy: {accuracy}')
 
@@ -150,6 +158,7 @@ def eval_mlp_classifier(model, eval_dataloader, loss_fn):
     model.eval()
 
     with torch.no_grad():
+        # Set total anc correct labels to zero
         correct_labels = 0
         total_labels = 0
         total_loss = 0
@@ -205,22 +214,21 @@ def init_weights(m):
 
 # Instantiating the model
 model = MLPClassif(input_size, hidden_size, num_classes, nn.ReLU())
+# Setting a seed for reproducibility
 torch.manual_seed(0)
+# Setting the initialization weights
 model.apply(init_weights)
 
 # Run training Loop
 model_tr, loss_all_epochs, accuracy_all_epochs, val_loss_all_epochs = training_mlp_classifier(model, train_dataloader, dev_dataloader,
                                                                                              num_epochs, loss_fn, lr)
-# Save model
-#torch.save(model_tr.state_dict(), 'model_mlp_classif_trained.pt')
 
 # Model evaluation
 test_accuracy, B_acc, I_acc, O_acc, test_loss = eval_mlp_classifier(model_tr, test_dataloader, loss_fn)
 
-print(f'All training loss values: {loss_all_epochs}')
-print(f'All validation loss values: {val_loss_all_epochs}')
 print(f'Best validation Accuracy: {max(accuracy_all_epochs):.3f}%')
 print(f'Test Accuracy: {test_accuracy:.3f}%')
 print(f'B Accuracy: {B_acc:.3f}%')
 print(f'I Accuracy: {I_acc:.3f}%')
 print(f'O Accuracy: {O_acc:.3f}%')
+print(f'Model saved to {model_save_dir}')
