@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, WeightedRandomSampler, random_split, Subset
+from sklearn.metrics import precision_recall_fscore_support
 import copy
 from tqdm import tqdm
 from preprocessing import TermsDataset
@@ -132,7 +133,7 @@ def training_mlp_classifier(model, train_dataloader, val_dataloader, num_epochs,
             loss_current_epoch += loss.item()
 
         # Checking validation accuracy, accuracy for each tag, and validation loss at each epoch
-        accuracy, B_acc, I_acc, O_acc, val_loss = eval_mlp_classifier(model_tr, val_dataloader, loss_fn)
+        accuracy, B_acc, I_acc, O_acc, val_loss, test_preds, test_labels = eval_mlp_classifier(model_tr, val_dataloader, loss_fn)
 
         # Best performing model saving implementation
         if accuracy_all_epochs != []:
@@ -169,6 +170,10 @@ def eval_mlp_classifier(model, eval_dataloader, loss_fn):
         B_total = 0
         B_correct = 0
 
+        # Lists to collect all predicitons and reference labels
+        total_preds_list = []
+        total_labels_list = []
+
         for text, labels in eval_dataloader:
             # Get the predicted labels
             y_predicted = model(text)
@@ -181,6 +186,10 @@ def eval_mlp_classifier(model, eval_dataloader, loss_fn):
             # Compute accuracy overall accuracy for each token
             total_labels += labels.size(0)
             correct_labels += (label_predicted == labels).sum().item()
+
+            total_preds_list.append(label_predicted)
+            total_labels_list.append(labels)
+
             # Loop to get the B, I, and O individual accuracies
             for index, lab in enumerate(labels):
                 if lab == 0:
@@ -202,7 +211,7 @@ def eval_mlp_classifier(model, eval_dataloader, loss_fn):
     I_acc = 100 * I_correct / I_total
     O_acc = 100 * O_correct / O_total
 
-    return accuracy, B_acc, I_acc, O_acc, final_loss
+    return accuracy, B_acc, I_acc, O_acc, final_loss, total_preds_list, total_labels_list
 
 
 # Initialization (to be able to reproduce experiments)
@@ -220,15 +229,48 @@ torch.manual_seed(0)
 model.apply(init_weights)
 
 # Run training Loop
+print('Beginning model training...')
 model_tr, loss_all_epochs, accuracy_all_epochs, val_loss_all_epochs = training_mlp_classifier(model, train_dataloader, dev_dataloader,
                                                                                              num_epochs, loss_fn, lr)
 
 # Model evaluation
-test_accuracy, B_acc, I_acc, O_acc, test_loss = eval_mlp_classifier(model_tr, test_dataloader, loss_fn)
+test_accuracy, B_acc, I_acc, O_acc, test_loss, total_preds, total_labels = eval_mlp_classifier(model_tr, test_dataloader, loss_fn)
 
+# Printing the accuracy results
+print('------------------------------')
 print(f'Best validation Accuracy: {max(accuracy_all_epochs):.3f}%')
 print(f'Test Accuracy: {test_accuracy:.3f}%')
 print(f'B Accuracy: {B_acc:.3f}%')
 print(f'I Accuracy: {I_acc:.3f}%')
 print(f'O Accuracy: {O_acc:.3f}%')
+print('------------------------------')
 print(f'Model saved to {model_save_dir}')
+print('------------------------------')
+
+# Converting predictions and labels to lists so we can run them through sklearn precision_recall_fscore_support
+total_preds2 = []
+total_labels2 = []
+
+for batch in total_preds:
+    for item in batch:
+        total_preds2.append(int(item))
+
+for batch in total_labels:
+    for item in batch:
+        total_labels2.append(int(item))
+
+# Precision, Recall, and F1 Score for MLP Classifier
+precision, recall, f1, support = precision_recall_fscore_support(total_labels2, total_preds2, labels=[0, 1, 2])
+
+# Printing the precision, recall and f1-scores
+for index, (P, R, F) in enumerate(zip(precision, recall, f1)):
+    if index == 0:
+        print('B')
+    elif index == 1:
+        print('I')
+    else:
+        print('O')
+    print(f'Precision: {P}')
+    print(f'Recall: {R}')
+    print(f'F1: {F}\n')
+
