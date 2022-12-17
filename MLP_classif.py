@@ -9,6 +9,7 @@ from preprocessing import TermsDataset
 
 # Enter the directory to the dataset
 directory = 'terminology-project-2022/' # Path to the annotated terminology project data
+# Enter the directory where you want to final model to be saved
 model_save_dir = 'models/model_MLP_classif.pt'
 
 # Model hyperparameters
