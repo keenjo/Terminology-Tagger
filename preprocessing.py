@@ -6,9 +6,11 @@ from tqdm import tqdm
 import torch
 from torch.utils.data import Dataset, DataLoader
 
+# Loading the spacy English mode
 nlp = spacy.load('en_core_web_sm')
 
-#directory = 'terminology-project-2022/' # Path to the annotated terminology project data
+# Path to the annotated terminology project data
+directory = 'terminology-project-2022/'
 
 class TermsDataset(Dataset):
 
@@ -16,6 +18,7 @@ class TermsDataset(Dataset):
         self.directory = directory # Directory where data is stored
         self.split = split # Dataset split -> train, dev, or test
         self.one_hot = one_hot # Choice of whether or not to do one-hot encoding
+        # Uncommented this b/c we only saved the vocab early on to check that it was correct
         #self.vocab_path = vocab_path # Directory where vocab will be saved
 
         # Preparing/Organizing the data
@@ -28,7 +31,7 @@ class TermsDataset(Dataset):
             Choice of data encoding:
             - Non one-hot: as N dimensional vector where N is the number of features
             - One-hot: each feature encoded in binary with N dimensions, where N is the number of options for each feature
-                - All of the feature vectors are then combined and reshaped into one vector
+                - All of the feature vectors are then combined into one vector
             '''
             self.encoded_data, self.encoded_tags = self.encode_data()
         else:
@@ -65,12 +68,10 @@ class TermsDataset(Dataset):
         for root, dirs, files in os.walk(self.directory):
             for file in sorted(files):
                 if file.endswith('.final'):
-                    #if self.split in root:
                     data_paths.append(os.path.join(root, file))
 
         # Preprocessing loop
         for fpath in data_paths:
-            #print(fpath)
             with open(fpath, 'r+', encoding='utf8') as f:
                 text = f.readlines()
 
@@ -81,9 +82,11 @@ class TermsDataset(Dataset):
             # Splitting the txt file into the word and tag lists
             for line in text:
                 if line == '\n':
+                    # Add annotation word the new lines as we will add <BOS> and <EOS> tokens for these in our feature dictionaries
                     words.append('#')
                     doc_tags.append('O')
                 elif line != '\n' and line != '':
+                    # Added try except below to deal with inconsistencies with separators between words and annotations
                     try:
                         word, tag = line.split('\t')
                     except ValueError:
@@ -100,6 +103,7 @@ class TermsDataset(Dataset):
                             doc_tags.append('O')
                     elif word == '' and tag == '':
                         continue
+                    # If there is a missing tag for a word we just annotate the 'O' tag
                     elif word != '' and tag == '':
                         words.append(word)
                         doc_tags.append('O')
@@ -109,9 +113,11 @@ class TermsDataset(Dataset):
             for index, token in enumerate(doc):
                 if str(token) != '#':
                     POS_list.append(token.pos_)
+                    # Lemmatization of the words
                     if str(token.lemma_) != words[index].lower():
                         words[index] = str(token.lemma_)
                 else:
+                    # If a '#' token is found (which will be converted to <BOS> or <EOS> later we assign 'X' as the POS tag
                     POS_list.append('X')
 
             # Change # to <EOS>
@@ -127,8 +133,6 @@ class TermsDataset(Dataset):
                 POS_total.append(pos)
 
             # Creating a dictionary of features for each input (ONLY FOR THE CHOSEN DATA SPLIT)
-            # - we can experiment with these features and definitely add more as we think of them
-            # - ** if we change the features, the create_vocab() and data encoding fxns will need to be updated accordingly
             if self.split in fpath: # Making sure to only organize data for the chosen data split
                 for index, word in enumerate(words):
                     if word != '<EOS>':
@@ -154,8 +158,8 @@ class TermsDataset(Dataset):
         '''
         Creating a vocabulary for each feature of the data
         - Returns:
-            - word_int: dictionary mapping possible words from annotated dataset to integers
-            - tag_int: dictionary mapping possible term tags from annotated dataset to integers
+            - word_int: dictionary mapping possible words from full annotated dataset to integers
+            - tag_int: dictionary mapping possible term tags (I,O,B) from full annotated dataset to integers
             - pos_int: dictionary mapping possible POS tags from feature dictionary to integers
             - bool_int: dictionary mapping possible boolean values from feature dictionary to integers
         '''
@@ -190,7 +194,8 @@ class TermsDataset(Dataset):
                        'Tag dict': tag_int,
                        'POS dict': pos_int,
                        'Bool dict': bool_int}
-        #int_tok = {v: k for k, v in word_int.items()}
+        # Creating an inverse integer to token mapping that could be used for decoding later if we want
+        int_tok = {v: k for k, v in word_int.items()}
 
         # Saving the tok_int vocabularies so we can decode the data later if we want to
         #with open(f'{self.vocab_path}/vocab_tok-int.json', 'w+') as file:
@@ -207,6 +212,7 @@ class TermsDataset(Dataset):
 
         for input in self.data:
             tensor_list = []
+            # For each feature we append an encoded feature to the input vector
             for key, value in input.items():
                 if 'word' in key.lower():
                     val = self.word_int[value]
@@ -232,6 +238,7 @@ class TermsDataset(Dataset):
 
         for input in self.data:
             tensor_list = []
+            # For each feature we append a one-hot encoded feature to the input vector
             for key, value in input.items():
                 if 'word' in key.lower():
                     val = torch.nn.functional.one_hot(torch.tensor(self.word_int[value]), num_classes=len(self.word_int))
@@ -247,27 +254,6 @@ class TermsDataset(Dataset):
                     tensor_list.append(val)
             data_one_hot.append(torch.cat(tensor_list).type(torch.float))
 
-        #tags_one_hot = [torch.nn.functional.one_hot(torch.tensor(self.tag_int[x]), num_classes=len(self.tag_int)).type(torch.float) for x in self.tags]
         tags_one_hot = [torch.tensor(self.tag_int[x]) for x in self.tags]
 
         return data_one_hot, tags_one_hot
-
-
-'''
-split = 'train' # train, test, or dev
-dataset = TermsDataset(directory, split, one_hot=True)
-print(f'{len(dataset)} inputs in {split} dataset')
-input_tensor, tag_tensor = dataset[0]
-print(f'Input Tensor Shape: {input_tensor.shape}')
-print(input_tensor)
-print(tag_tensor)
-print(input_tensor.type())
-'''
-# Testing to make sure data works with DataLoader
-'''
-text_dataloader = DataLoader(dataset, batch_size=5, shuffle=True)
-batch_data, batch_name = next(iter(text_dataloader))
-print(batch_data.shape)
-print(batch_name.shape)
-print(batch_name)
-'''
